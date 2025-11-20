@@ -266,4 +266,75 @@
     )
 )
 
+;; Advanced compliance verification with multi-factor checks
+;; This function performs comprehensive compliance verification including
+;; score validation, expiry checks, framework requirements, and risk assessment
+(define-public (verify-comprehensive-compliance
+    (entity principal)
+    (framework-id (string-ascii 50))
+    (required-min-score uint))
+    (let
+        (
+            (entity-record (map-get? entity-compliance entity))
+            (framework (map-get? compliance-frameworks framework-id))
+            (officer-authorized (default-to false (map-get? compliance-officers tx-sender)))
+        )
+        (asserts! officer-authorized err-unauthorized)
+        
+        (match entity-record
+            compliance-data
+                (match framework
+                    framework-data
+                        (let
+                            (
+                                (score (get compliance-score compliance-data))
+                                (status (get status compliance-data))
+                                (expiry (get expiry-date compliance-data))
+                                (framework-min (get min-score framework-data))
+                                (framework-active (get active framework-data))
+                                (entity-framework (get framework-id compliance-data))
+                                (risk (get risk-level compliance-data))
+                                
+                                ;; Comprehensive checks
+                                (score-meets-requirement (>= score required-min-score))
+                                (score-meets-framework (>= score framework-min))
+                                (not-expired (not (is-expired expiry)))
+                                (status-is-compliant (is-eq status status-compliant))
+                                (framework-matches (is-eq entity-framework framework-id))
+                                (framework-is-active framework-active)
+                                (risk-acceptable (<= risk u2))
+                                
+                                ;; Overall compliance result
+                                (is-fully-compliant 
+                                    (and score-meets-requirement
+                                        (and score-meets-framework
+                                            (and not-expired
+                                                (and status-is-compliant
+                                                    (and framework-matches
+                                                        (and framework-is-active risk-acceptable)))))))
+                            )
+                            (ok {
+                                compliant: is-fully-compliant,
+                                score: score,
+                                status: status,
+                                risk-level: risk,
+                                expiry-block: expiry,
+                                framework-active: framework-active,
+                                checks-passed: {
+                                    score-requirement: score-meets-requirement,
+                                    framework-requirement: score-meets-framework,
+                                    not-expired: not-expired,
+                                    status-valid: status-is-compliant,
+                                    framework-match: framework-matches,
+                                    risk-level-ok: risk-acceptable
+                                }
+                            })
+                        )
+                    err-not-found
+                )
+            err-not-found
+        )
+    )
+)
+
 
